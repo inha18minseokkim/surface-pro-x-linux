@@ -41,13 +41,13 @@ docs/       전략 및 컴포넌트별 상세 문서
 |------|----------|------|
 | #1 | 전체 개요 / 프로젝트 기반 | ✅ 완료 (이 레포) |
 | #2 | 부팅 환경 (UEFI/GRUB/Secure Boot) | 🔧 문서·스크립트 완료, 실기기 검증 대기 |
-| #3 | sc8180xp Device Tree | 🔧 초안 완료, ACPI 덤프 대기 (TODO(acpi)) |
-| #4 | NVMe PCIe quirk | 🔧 패치 작성 완료 (`patches/0100`), 실기기 검증 대기 |
-| #5 | GPU (Adreno 680, freedreno) | DT 노드·config 준비됨, zap firmware 필요 |
-| #6 | Wi-Fi/BT (ath10k SNOC — 이슈의 ath11k는 오기) | DT 노드·config 준비됨, firmware 필요 |
-| #7 | 셀룰러 모뎀 (X24, MHI/WWAN) | 🔧 메인라인 지원 확인 (17cb:0304), 실기기 검증 대기 |
-| #8 | Type Cover 키보드/터치패드 | USB HID 경로 — 부팅 후 확인 |
-| #9 | 카메라/터치스크린/센서 | blocked (펌웨어 부재) |
+| #3 | sc8180xp Device Tree | 🔧 v2 — 실기기 ACPI 덤프 반영 (`dts/acpi-dumps/FINDINGS.md`), PEP GPIO만 미해결 |
+| #4 | NVMe PCIe quirk | 🔧 패치 완료, 실기기에서 consumer-window 구조 확인됨. NVMe는 **pcie2** |
+| #5 | GPU (Adreno 680, freedreno) | zap firmware 추출 완료 (`qcdxkmsuc8180.mbn`) |
+| #6 | Wi-Fi/BT (ath10k SNOC — 이슈의 ath11k는 오기) | firmware 추출 완료 (wlanmdsp/bdwlan, BT tlv) |
+| #7 | 셀룰러 모뎀 (X24 = **내장 MPSS**, PCIe 아님) | 🔧 remoteproc+QRTR+IPA 경로 확정, firmware 추출 완료 |
+| #8 | Type Cover (Surface Aggregator, **uart15** 4Mbaud) | SSH=MSHW0084 확인, SAM DT 바인딩 패치 필요 |
+| #9 | 카메라/터치스크린/센서 | 터치=HID over SPI(spi1, IRQ 122) 확정. 카메라 Spectra 390 blocked |
 | #10 | 빌드 환경 가이드 | ✅ scripts/ + configs/ 로 구현 |
 
 ## 빠른 시작 (x86_64 호스트에서 크로스 빌드)

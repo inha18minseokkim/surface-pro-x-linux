@@ -5,14 +5,21 @@
  * Based on mainline sc8180x-lenovo-flex-5g.dts (closest reference platform:
  * same SoC family, same PMICs, same WCN3998 Wi-Fi/BT).
  *
- * STATUS: DRAFT (issue #3). Items marked TODO(acpi) carry Flex 5G values as
- * placeholders and MUST be confirmed against the Surface Pro X ACPI DSDT dump
- * (see dts/README.md for the dump procedure) before flashing.
+ * STATUS: DRAFT v2 (issue #3). Updated with values extracted from the real
+ * device's ACPI DSDT (dts/acpi-dumps/, dumped 2026-06-12). Items still marked
+ * TODO(acpi-pep) are buried in the PEP (Power Engine Plug-in) tables and need
+ * further DSDT analysis.
  *
- * Key board differences vs Flex 5G:
- *   - Storage: NVMe on PCIe (Flex 5G uses UFS) -> UFS removed, PCIe0 added
- *   - Cellular: Snapdragon X24 (SDX24) on PCIe (Flex 5G: SDX55) -> issue #7
- *   - Keyboard: Surface Type Cover, enumerates over USB -> no I2C kb node
+ * Hardware-confirmed facts (from DSDT + Windows PnP):
+ *   - Storage: NVMe (SK hynix 1c5c:1327) on PCIe2. PCIe0/PCIe3 root ports
+ *     exist but have no children; PCIe1 is disabled.
+ *   - Cellular: X24 is the SoC-integrated MPSS (ACPI QCOM041E, QCMS bus),
+ *     NOT a discrete PCIe modem -> remoteproc_mpss path, issue #7
+ *   - Touchscreen: HID-over-SPI (MSHW0235) on QUP SE 0x884000 (= &spi1),
+ *     25 MHz CS0, IRQ TLMM GPIO 122
+ *   - Surface Aggregator (SSH, MSHW0084) on UART 0xc94000 (= &uart15),
+ *     4000000 baud -> Type Cover / battery / hotkeys, issue #8
+ *   - BT: UART 0xc8c000 (= &uart13), same as Flex 5G
  *   - Display: 13" 2880x1920 eDP panel
  */
 
@@ -330,27 +337,25 @@
 };
 
 &gpu_zap_shader {
-	/* Extract from Windows: qcdxkmsuc8180.mbn (see firmware/README.md) */
-	firmware-name = "qcom/sc8180xp/MICROSOFT/SPX/qcdxkmsuc8180.mbn";
+	/* Confirmed filename, extracted from Windows qcdx8180 driver package */
+	firmware-name = "qcom/sc8180x/MICROSOFT/qcdxkmsuc8180.mbn";
 };
 
 /*
- * Touchscreen: hid-over-i2c device. TODO(acpi): bus instance, slave address,
- * HID descriptor address and IRQ GPIO must come from the DSDT. Template kept
- * disabled until then.
+ * Touchscreen: HID over SPI (ACPI: GTCH, _HID MSHW0235, _CID PNP0C51).
+ * Confirmed from DSDT: QUP SE at 0x884000 (= spi1), 25 MHz, CS0, SPI mode 0,
+ * IRQ TLMM GPIO 122.
+ * NOTE: mainline has no generic HID-over-SPI host driver — needs Microsoft's
+ * out-of-tree spi-hid driver (linux-surface carries it). Node kept disabled
+ * until that driver is in the patches/ series (issue #9).
  */
-&i2c1 {
-	clock-frequency = <100000>;
+&spi1 {
+	status = "disabled";
 
-	pinctrl-0 = <&i2c1_active>;
-	pinctrl-names = "default";
-
-	status = "disabled"; /* enable after TODO(acpi) is resolved */
-
-	touchscreen@10 {
-		compatible = "hid-over-i2c";
-		reg = <0x10>;
-		hid-descr-addr = <0x1>;
+	touchscreen@0 {
+		compatible = "hid-over-spi"; /* matches MS spi-hid driver binding */
+		reg = <0>;
+		spi-max-frequency = <25000000>;
 
 		interrupts-extended = <&tlmm 122 IRQ_TYPE_LEVEL_LOW>;
 
@@ -360,8 +365,8 @@
 };
 
 /*
- * No I2C keyboard/touchpad nodes: the Surface Type Cover enumerates as a USB
- * HID device through the Surface Connector (issue #8).
+ * No I2C keyboard/touchpad nodes: the Surface Type Cover is driven through
+ * the Surface Aggregator on &uart15 (issue #8), not I2C/USB.
  */
 
 &mdss {
@@ -415,42 +420,23 @@
 };
 
 /*
- * PCIe0: NVMe SSD (issue #4).
- * TODO(acpi): root port instance and perst/wake/clkreq GPIOs. Flex 5G has no
- * NVMe, so these placeholders come from the sc8180x reference design.
+ * PCIe2: NVMe SSD (issue #4). Confirmed from ACPI/PnP: host bridge PNP0A08
+ * _UID 2, window 0x70200000 (= mainline pcie2 at 0x1c18000), child device
+ * SK hynix NVMe 1c5c:1327. PCIe0/PCIe3 ports are empty, PCIe1 disabled —
+ * all left off.
+ * TODO(acpi-pep): perst/wake/clkreq GPIOs are managed by the PEP on Windows;
+ * pins below are unverified sc8180x reference values.
  */
-&pcie0 {
-	perst-gpios = <&tlmm 35 GPIO_ACTIVE_LOW>;
-	wake-gpios = <&tlmm 37 GPIO_ACTIVE_HIGH>;
-	pinctrl-0 = <&pcie0_default_state>;
+&pcie2 {
+	perst-gpios = <&tlmm 102 GPIO_ACTIVE_LOW>;
+	wake-gpios = <&tlmm 104 GPIO_ACTIVE_HIGH>;
+	pinctrl-0 = <&pcie2_default_state>;
 	pinctrl-names = "default";
 
 	status = "okay";
 };
 
-&pcie0_phy {
-	vdda-phy-supply = <&vreg_l5e_0p88>;
-	vdda-pll-supply = <&vreg_l3c_1p2>;
-
-	status = "okay";
-};
-
-/*
- * PCIe3: Snapdragon X24 (SDX24) LTE modem (issue #7).
- * Enumerates as an MHI endpoint; needs the SDX24 id added to
- * drivers/bus/mhi/host/pci_generic.c (patches/04xx series).
- * TODO(acpi): GPIOs unverified (Flex 5G values).
- */
-&pcie3 {
-	perst-gpios = <&tlmm 178 GPIO_ACTIVE_LOW>;
-	wake-gpios = <&tlmm 180 GPIO_ACTIVE_HIGH>;
-	pinctrl-0 = <&pcie3_default_state>;
-	pinctrl-names = "default";
-
-	status = "okay";
-};
-
-&pcie3_phy {
+&pcie2_phy {
 	vdda-phy-supply = <&vreg_l5e_0p88>;
 	vdda-pll-supply = <&vreg_l3c_1p2>;
 
@@ -479,23 +465,42 @@
 
 &remoteproc_adsp {
 	memory-region = <&adsp_mem>;
-	firmware-name = "qcom/sc8180xp/MICROSOFT/SPX/qcadsp8180.mbn";
+	firmware-name = "qcom/sc8180x/MICROSOFT/qcadsp8180.mbn";
 
 	status = "okay";
 };
 
 &remoteproc_cdsp {
 	memory-region = <&cdsp_mem>;
-	firmware-name = "qcom/sc8180xp/MICROSOFT/SPX/qccdsp8180.mbn";
+	firmware-name = "qcom/sc8180x/MICROSOFT/qccdsp8180.mbn";
 
 	status = "okay";
 };
 
 /*
- * NOTE: unlike phone-style platforms, the SPX modem (X24) is a discrete PCIe
- * device, not the integrated MPSS — remoteproc_mpss stays disabled unless the
- * ACPI dump shows otherwise.
+ * Cellular (issue #7): the X24 LTE modem is the SoC-integrated MPSS
+ * (confirmed: ACPI QCOM041E platform device + QCMS-bus NIC on Windows,
+ * no PCIe modem present). Same path as Flex 5G: boot the modem DSP via
+ * remoteproc, control via QRTR, data via IPA. Firmware names confirmed
+ * from the surfaceprox_subextmpss driver package.
  */
+&remoteproc_mpss {
+	memory-region = <&mpss_mem>;
+	firmware-name = "qcom/sc8180x/MICROSOFT/qcmpss8180_nm.mbn";
+
+	status = "okay";
+};
+
+/*
+ * Surface Aggregator / Surface Serial Hub (issue #8): ACPI device SSH
+ * (MSHW0084) on UART at 0xc94000 (= uart15), 4000000 baud, RX wake GPIO 30.
+ * Type Cover keyboard/touchpad, battery and hotkeys are behind it.
+ * The linux-surface surface_aggregator driver is ACPI-only today; a DT
+ * binding patch is needed before this node can be used (patches/05xx).
+ */
+&uart15 {
+	status = "disabled"; /* enable together with the SAM DT-binding patch */
+};
 
 &uart13 {
 	pinctrl-0 = <&uart13_state>;
@@ -634,23 +639,16 @@
 		bias-disable;
 	};
 
-	i2c1_active: i2c1-active-state {
-		pins = "gpio114", "gpio115";
-		function = "qup1";
-
-		bias-pull-up;
-		drive-strength = <2>;
-	};
-
-	pcie0_default_state: pcie0-default-state {
+	/* TODO(acpi-pep): pcie2 pin numbers unverified (PEP-managed on Windows) */
+	pcie2_default_state: pcie2-default-state {
 		clkreq-pins {
-			pins = "gpio36";
-			function = "pci_e0";
+			pins = "gpio103";
+			function = "pci_e2";
 			bias-pull-up;
 		};
 
 		reset-n-pins {
-			pins = "gpio35";
+			pins = "gpio102";
 			function = "gpio";
 
 			drive-strength = <2>;
@@ -659,7 +657,7 @@
 		};
 
 		wake-n-pins {
-			pins = "gpio37";
+			pins = "gpio104";
 			function = "gpio";
 
 			drive-strength = <2>;
@@ -667,31 +665,7 @@
 		};
 	};
 
-	pcie3_default_state: pcie3-default-state {
-		clkreq-pins {
-			pins = "gpio179";
-			function = "pci_e3";
-			bias-pull-up;
-		};
-
-		reset-n-pins {
-			pins = "gpio178";
-			function = "gpio";
-
-			drive-strength = <2>;
-			output-low;
-			bias-pull-down;
-		};
-
-		wake-n-pins {
-			pins = "gpio180";
-			function = "gpio";
-
-			drive-strength = <2>;
-			bias-pull-up;
-		};
-	};
-
+	/* Confirmed from DSDT: touchscreen IRQ on TLMM GPIO 122 */
 	ts_int_default: ts-int-default-state {
 		pins = "gpio122";
 		function = "gpio";
