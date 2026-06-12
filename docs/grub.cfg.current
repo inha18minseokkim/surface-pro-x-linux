@@ -6,7 +6,7 @@ menuentry "Ubuntu ARM64 (minimal DT: USB-only)" {
     devicetree /sc8180xp-spx-minimal.dtb
     linux /Image.gz root=PARTUUID=73621fa8-845a-453c-b93e-610e13c4d7a3 rw rootwait \
         earlycon=efifb keep_bootcon console=tty0 \
-        module_blacklist=msm \
+        module_blacklist=msm fw_devlink=off panic=10 \
         clk_ignore_unused pd_ignore_unused arm64.nopauth efi=noruntime \
         ignore_loglevel
 }
