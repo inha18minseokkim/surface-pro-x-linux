@@ -1,0 +1,18 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/*
+ * Surface Pro X bring-up CONTROL DTS: nothing enabled beyond what
+ * sc8180x.dtsi turns on by default. No regulators, no USB. Used to
+ * bisect whether the hidden panic comes from the USB path or from
+ * base SoC nodes. This cannot reach a rootfs by design.
+ */
+
+/dts-v1/;
+
+#include "sc8180xp.dtsi"
+#include "sc8180x-pmics.dtsi"
+
+/ {
+	model = "Microsoft Surface Pro X (SQ2) control";
+	compatible = "microsoft,surface-pro-x-sq2", "qcom,sc8180xp",
+		     "qcom,sc8180x";
+};
