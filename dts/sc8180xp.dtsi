@@ -24,3 +24,19 @@
 	 * Inherits sc8180x (Adreno 675/680) tables for now.
 	 */
 };
+
+&soc {
+	/*
+	 * APSS watchdog, missing from mainline sc8180x.dtsi. The Surface
+	 * firmware arms a watchdog that Windows services; without a driver
+	 * petting it Linux powers off after a few minutes (same story as
+	 * the ThinkPad X13s bring-up). Block address as on sm8150 (same
+	 * SoC generation).
+	 */
+	watchdog@17c10000 {
+		compatible = "qcom,apss-wdt-sc8180x", "qcom,kpss-wdt";
+		reg = <0 0x17c10000 0 0x1000>;
+		clocks = <&sleep_clk>;
+		interrupts = <GIC_SPI 0 IRQ_TYPE_EDGE_RISING>;
+	};
+};

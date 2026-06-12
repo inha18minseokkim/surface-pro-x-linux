@@ -98,17 +98,16 @@
 	};
 };
 
+/*
+ * USB2 (high-speed) only for bring-up: the QMP combo PHY (USB3+DP) is the
+ * prime SError suspect — its register region may be unclocked depending on
+ * what state the firmware left. The SNPS femto HS PHY is self-contained.
+ * 480 Mbps is plenty for a USB rootfs.
+ */
 &usb_prim_hsphy {
 	vdda-pll-supply = <&vreg_l5e_0p88>;
 	vdda18-supply = <&vreg_l12a_1p8>;
 	vdda33-supply = <&vreg_l16e_3p0>;
-
-	status = "okay";
-};
-
-&usb_prim_qmpphy {
-	vdda-phy-supply = <&vreg_l3c_1p2>;
-	vdda-pll-supply = <&vreg_l5e_0p88>;
 
 	status = "okay";
 };
@@ -119,6 +118,9 @@
 
 &usb_prim_dwc3 {
 	dr_mode = "host";
+	phys = <&usb_prim_hsphy>;
+	phy-names = "usb2-phy";
+	maximum-speed = "high-speed";
 };
 
 &usb_sec_hsphy {
@@ -129,17 +131,13 @@
 	status = "okay";
 };
 
-&usb_sec_qmpphy {
-	vdda-phy-supply = <&vreg_l3c_1p2>;
-	vdda-pll-supply = <&vreg_l5e_0p88>;
-
-	status = "okay";
-};
-
 &usb_sec {
 	status = "okay";
 };
 
 &usb_sec_dwc3 {
 	dr_mode = "host";
+	phys = <&usb_sec_hsphy>;
+	phy-names = "usb2-phy";
+	maximum-speed = "high-speed";
 };
