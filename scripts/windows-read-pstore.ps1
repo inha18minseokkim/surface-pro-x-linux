@@ -19,7 +19,7 @@ public class EfiVars {
   [DllImport("advapi32.dll", SetLastError=true)]
   public static extern bool AdjustTokenPrivileges(IntPtr tok, bool dis, ref TOKEN_PRIVILEGES tp, uint len, IntPtr prev, IntPtr ret);
   [DllImport("kernel32.dll")] public static extern IntPtr GetCurrentProcess();
-  [StructLayout(LayoutKind.Sequential)]
+  [StructLayout(LayoutKind.Sequential, Pack=4)]
   public struct TOKEN_PRIVILEGES { public uint Count; public long Luid; public uint Attr; }
 }
 '@
@@ -31,14 +31,17 @@ $luid = 0L
 [EfiVars]::LookupPrivilegeValue($null, "SeSystemEnvironmentPrivilege", [ref]$luid) | Out-Null
 $tp = New-Object EfiVars+TOKEN_PRIVILEGES
 $tp.Count = 1; $tp.Luid = $luid; $tp.Attr = 2
-[EfiVars]::AdjustTokenPrivileges($tok, $false, [ref]$tp, 0, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
+$ok = [EfiVars]::AdjustTokenPrivileges($tok, $false, [ref]$tp, 16, [IntPtr]::Zero, [IntPtr]::Zero)
+Write-Output "AdjustTokenPrivileges=$ok lastErr=$([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
 
 # enumerate all variable names (class 1 = names only)
 $len = [uint32]0
 [EfiVars]::NtEnumerateSystemEnvironmentValuesEx(1, [IntPtr]::Zero, [ref]$len) | Out-Null
+if ($len -eq 0) { Write-Output "enumeration size probe failed (privilege?)"; Write-Output "=== PSTORE READ DONE"; Stop-Transcript; exit 1 }
 $buf = [Runtime.InteropServices.Marshal]::AllocHGlobal([int]$len)
 $r = [EfiVars]::NtEnumerateSystemEnvironmentValuesEx(1, $buf, [ref]$len)
 Write-Output "enum status=$r len=$len"
+if ($r -ne 0) { Write-Output "enumeration failed"; Write-Output "=== PSTORE READ DONE"; Stop-Transcript; exit 1 }
 
 # walk VARIABLE_NAME entries: ULONG NextEntryOffset; GUID VendorGuid; WCHAR Name[];
 $pstoreVars = @()
