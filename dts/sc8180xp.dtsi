@@ -1,0 +1,26 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/*
+ * sc8180xp (Snapdragon 8cx Gen 2, Microsoft SQ2) SoC definition.
+ *
+ * Gen 2 is a speed-bump of sc8180x (Gen 1): same die family, same peripheral
+ * blocks, higher CPU/GPU clocks. There is no mainline sc8180xp.dtsi, so this
+ * file is a thin overlay on sc8180x.dtsi.
+ *
+ * Known Gen1 -> Gen2 deltas (issue #3):
+ *   - Prime-core max freq: 3.0 GHz -> 3.15 GHz
+ *   - GPU: Adreno 680, higher top clock (MS brands it "Adreno 690" on SQ2)
+ *
+ * Bring-up policy: keep the conservative sc8180x OPP/clock tables until the
+ * platform is stable, then add sc8180xp OPP entries here once values are
+ * confirmed from the Windows driver / ACPI dump. Running Gen2 silicon at
+ * Gen1 clocks is safe; the reverse is not.
+ */
+
+#include "sc8180x.dtsi"
+
+&gpu {
+	/*
+	 * TODO(issue #5): sc8180xp speed-bin and OPP table.
+	 * Inherits sc8180x (Adreno 675/680) tables for now.
+	 */
+};

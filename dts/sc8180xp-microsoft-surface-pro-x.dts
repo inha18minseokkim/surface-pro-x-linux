@@ -1,0 +1,723 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/*
+ * Microsoft Surface Pro X (SQ2) — sc8180xp
+ *
+ * Based on mainline sc8180x-lenovo-flex-5g.dts (closest reference platform:
+ * same SoC family, same PMICs, same WCN3998 Wi-Fi/BT).
+ *
+ * STATUS: DRAFT (issue #3). Items marked TODO(acpi) carry Flex 5G values as
+ * placeholders and MUST be confirmed against the Surface Pro X ACPI DSDT dump
+ * (see dts/README.md for the dump procedure) before flashing.
+ *
+ * Key board differences vs Flex 5G:
+ *   - Storage: NVMe on PCIe (Flex 5G uses UFS) -> UFS removed, PCIe0 added
+ *   - Cellular: Snapdragon X24 (SDX24) on PCIe (Flex 5G: SDX55) -> issue #7
+ *   - Keyboard: Surface Type Cover, enumerates over USB -> no I2C kb node
+ *   - Display: 13" 2880x1920 eDP panel
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/firmware/qcom,scm.h>
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/gpio-keys.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/regulator/qcom,rpmh-regulator.h>
+#include "sc8180xp.dtsi"
+#include "sc8180x-pmics.dtsi"
+
+/ {
+	model = "Microsoft Surface Pro X (SQ2)";
+	compatible = "microsoft,surface-pro-x-sq2", "qcom,sc8180xp",
+		     "qcom,sc8180x";
+
+	aliases {
+		serial0 = &uart13; /* TODO(acpi): debug UART instance unverified */
+	};
+
+	backlight: backlight {
+		compatible = "pwm-backlight";
+		/* TODO(acpi): PWM channel and enable GPIO are Flex 5G values */
+		pwms = <&pmc8180c_lpg 4 1000000>;
+		enable-gpios = <&pmc8180c_gpios 8 GPIO_ACTIVE_HIGH>;
+
+		pinctrl-0 = <&bl_pwm_default>;
+		pinctrl-names = "default";
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+
+		pinctrl-0 = <&hall_int_active_state>;
+		pinctrl-names = "default";
+
+		/* Kickstand/cover hall sensor. TODO(acpi): GPIO unverified */
+		lid-switch {
+			gpios = <&tlmm 121 GPIO_ACTIVE_LOW>;
+			linux,input-type = <EV_SW>;
+			linux,code = <SW_LID>;
+			wakeup-source;
+			wakeup-event-action = <EV_ACT_DEASSERTED>;
+		};
+	};
+
+	pmic-glink {
+		compatible = "qcom,sc8180x-pmic-glink", "qcom,pmic-glink";
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+		/* TODO(acpi): orientation GPIOs */
+		orientation-gpios = <&tlmm 38 GPIO_ACTIVE_HIGH>,
+				    <&tlmm 58 GPIO_ACTIVE_HIGH>;
+
+		/* SPX has two USB-C ports */
+		connector@0 {
+			compatible = "usb-c-connector";
+			reg = <0>;
+			power-role = "dual";
+			data-role = "dual";
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				port@0 {
+					reg = <0>;
+
+					pmic_glink_con0_hs: endpoint {
+						remote-endpoint = <&usb_prim_dwc3_hs>;
+					};
+				};
+
+				port@1 {
+					reg = <1>;
+
+					pmic_glink_con0_ss: endpoint {
+						remote-endpoint = <&usb_prim_qmpphy_out>;
+					};
+				};
+			};
+		};
+
+		connector@1 {
+			compatible = "usb-c-connector";
+			reg = <1>;
+			power-role = "dual";
+			data-role = "dual";
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				port@0 {
+					reg = <0>;
+
+					pmic_glink_con1_hs: endpoint {
+						remote-endpoint = <&usb_sec_dwc3_hs>;
+					};
+				};
+
+				port@1 {
+					reg = <1>;
+
+					pmic_glink_con1_ss: endpoint {
+						remote-endpoint = <&usb_sec_qmpphy_out>;
+					};
+				};
+			};
+		};
+	};
+
+	reserved-memory {
+		/*
+		 * TODO(acpi): all carve-out addresses below are Flex 5G values.
+		 * Confirm against the SPX UEFI memory map (efi memmap) and the
+		 * reserved regions in the ACPI tables before enabling the
+		 * remoteprocs — wrong carve-outs cause instant SoC hangs.
+		 */
+		rmtfs_mem: rmtfs-region@85500000 {
+			compatible = "qcom,rmtfs-mem";
+			reg = <0x0 0x85500000 0x0 0x200000>;
+			no-map;
+
+			qcom,client-id = <1>;
+			qcom,vmid = <QCOM_SCM_VMID_MSS_MSA>;
+		};
+
+		wlan_mem: wlan-region@8bc00000 {
+			reg = <0x0 0x8bc00000 0x0 0x180000>;
+			no-map;
+		};
+
+		mpss_mem: mpss-region@8d800000 {
+			reg = <0x0 0x8d800000 0x0 0x3000000>;
+			no-map;
+		};
+
+		adsp_mem: adsp-region@90800000 {
+			reg = <0x0 0x90800000 0x0 0x1c00000>;
+			no-map;
+		};
+
+		cdsp_mem: cdsp-region@98900000 {
+			reg = <0x0 0x98900000 0x0 0x1400000>;
+			no-map;
+		};
+	};
+
+	vph_pwr: vph-pwr-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "vph_pwr";
+		regulator-min-microvolt = <3700000>;
+		regulator-max-microvolt = <3700000>;
+	};
+
+	vreg_s4a_1p8: pm8150-s4-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "vreg_s4a_1p8";
+
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+
+		regulator-always-on;
+		regulator-boot-on;
+
+		vin-supply = <&vph_pwr>;
+	};
+
+	/*
+	 * 3.3V rail for the PCIe-attached NVMe and the SDX24 modem.
+	 * TODO(acpi): actual supply topology — may be a PMIC LDO or a
+	 * GPIO-controlled load switch.
+	 */
+	vreg_nvme_3p3: nvme-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "vreg_nvme_3p3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-always-on;
+		vin-supply = <&vph_pwr>;
+	};
+};
+
+&apps_rsc {
+	/*
+	 * RPMh regulator rails. Same pmc8180/pmc8180c PMIC family as Flex 5G;
+	 * voltage values inherited. TODO(acpi): diff against SPX DSDT PEP
+	 * tables — rails feeding panel/touch are most likely to differ.
+	 */
+	regulators-0 {
+		compatible = "qcom,pmc8180-rpmh-regulators";
+		qcom,pmic-id = "a";
+
+		vdd-s5-supply = <&vph_pwr>;
+		vdd-l7-l12-l14-l15-supply = <&vreg_s5a_2p0>;
+
+		vreg_s5a_2p0: smps5 {
+			regulator-min-microvolt = <2040000>;
+			regulator-max-microvolt = <2100000>;
+		};
+
+		vreg_l7a_1p8: ldo7 {
+			regulator-min-microvolt = <1800000>;
+			regulator-max-microvolt = <1800000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+		};
+
+		vreg_l9a_1p3: ldo9 {
+			regulator-min-microvolt = <1296000>;
+			regulator-max-microvolt = <1304000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+		};
+
+		vreg_l12a_1p8: ldo12 {
+			regulator-min-microvolt = <1800000>;
+			regulator-max-microvolt = <1800000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+		};
+	};
+
+	regulators-1 {
+		compatible = "qcom,pmc8180c-rpmh-regulators";
+		qcom,pmic-id = "c";
+
+		vdd-s6-supply = <&vph_pwr>;
+		vdd-l2-l3-supply = <&vreg_s6c_1p35>;
+		vdd-bob-supply = <&vph_pwr>;
+
+		vreg_s6c_1p35: smps6 {
+			regulator-min-microvolt = <1350000>;
+			regulator-max-microvolt = <1372000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+		};
+
+		vreg_l3c_1p2: ldo3 {
+			regulator-min-microvolt = <1200000>;
+			regulator-max-microvolt = <1200000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+		};
+
+		vreg_l10c_3p3: ldo10 {
+			regulator-min-microvolt = <3000000>;
+			regulator-max-microvolt = <3312000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+		};
+
+		vreg_l11c_3p3: ldo11 {
+			regulator-min-microvolt = <3296000>;
+			regulator-max-microvolt = <3304000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+		};
+
+		vreg_bob: bob {
+			regulator-min-microvolt = <3296000>;
+			regulator-max-microvolt = <3350000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+		};
+	};
+
+	regulators-2 {
+		compatible = "qcom,pmc8180-rpmh-regulators";
+		qcom,pmic-id = "e";
+
+		vdd-s4-supply = <&vph_pwr>;
+		vdd-s5-supply = <&vph_pwr>;
+		vdd-l2-l10-supply = <&vreg_bob>;
+		vdd-l3-l4-l5-l18-supply = <&vreg_s4e_0p98>;
+		vdd-l7-l12-l14-l15-supply = <&vreg_s5e_2p05>;
+		vdd-l13-l16-l17-supply = <&vreg_bob>;
+
+		vreg_s4e_0p98: smps4 {
+			regulator-min-microvolt = <992000>;
+			regulator-max-microvolt = <992000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+		};
+
+		vreg_s5e_2p05: smps5 {
+			regulator-min-microvolt = <2040000>;
+			regulator-max-microvolt = <2040000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+		};
+
+		vreg_l1e_0p75: ldo1 {
+			regulator-min-microvolt = <752000>;
+			regulator-max-microvolt = <752000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+		};
+
+		vreg_l5e_0p88: ldo5 {
+			regulator-min-microvolt = <880000>;
+			regulator-max-microvolt = <880000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+		};
+
+		vreg_l7e_1p8: ldo7 {
+			regulator-min-microvolt = <1800000>;
+			regulator-max-microvolt = <1800000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+		};
+
+		vreg_l16e_3p0: ldo16 {
+			regulator-min-microvolt = <3072000>;
+			regulator-max-microvolt = <3072000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+		};
+	};
+};
+
+&gpu {
+	status = "okay";
+};
+
+&gpu_zap_shader {
+	/* Extract from Windows: qcdxkmsuc8180.mbn (see firmware/README.md) */
+	firmware-name = "qcom/sc8180xp/MICROSOFT/SPX/qcdxkmsuc8180.mbn";
+};
+
+/*
+ * Touchscreen: hid-over-i2c device. TODO(acpi): bus instance, slave address,
+ * HID descriptor address and IRQ GPIO must come from the DSDT. Template kept
+ * disabled until then.
+ */
+&i2c1 {
+	clock-frequency = <100000>;
+
+	pinctrl-0 = <&i2c1_active>;
+	pinctrl-names = "default";
+
+	status = "disabled"; /* enable after TODO(acpi) is resolved */
+
+	touchscreen@10 {
+		compatible = "hid-over-i2c";
+		reg = <0x10>;
+		hid-descr-addr = <0x1>;
+
+		interrupts-extended = <&tlmm 122 IRQ_TYPE_LEVEL_LOW>;
+
+		pinctrl-0 = <&ts_int_default>;
+		pinctrl-names = "default";
+	};
+};
+
+/*
+ * No I2C keyboard/touchpad nodes: the Surface Type Cover enumerates as a USB
+ * HID device through the Surface Connector (issue #8).
+ */
+
+&mdss {
+	status = "okay";
+};
+
+&mdss_dp0 {
+	status = "okay";
+};
+
+&mdss_dp0_out {
+	data-lanes = <0 1>;
+	remote-endpoint = <&usb_prim_qmpphy_dp_in>;
+};
+
+&mdss_dp1 {
+	status = "okay";
+};
+
+&mdss_dp1_out {
+	data-lanes = <0 1>;
+	remote-endpoint = <&usb_sec_qmpphy_dp_in>;
+};
+
+&mdss_edp {
+	pinctrl-0 = <&edp_hpd_active>;
+	pinctrl-names = "default";
+
+	status = "okay";
+
+	aux-bus {
+		panel {
+			/* 13" 2880x1920. EDID read over AUX at runtime. */
+			compatible = "edp-panel";
+			no-hpd;
+
+			backlight = <&backlight>;
+
+			port {
+				spx_panel_in: endpoint {
+					remote-endpoint = <&mdss_edp_out>;
+				};
+			};
+		};
+	};
+};
+
+&mdss_edp_out {
+	data-lanes = <0 1 2 3>;
+	remote-endpoint = <&spx_panel_in>;
+};
+
+/*
+ * PCIe0: NVMe SSD (issue #4).
+ * TODO(acpi): root port instance and perst/wake/clkreq GPIOs. Flex 5G has no
+ * NVMe, so these placeholders come from the sc8180x reference design.
+ */
+&pcie0 {
+	perst-gpios = <&tlmm 35 GPIO_ACTIVE_LOW>;
+	wake-gpios = <&tlmm 37 GPIO_ACTIVE_HIGH>;
+	pinctrl-0 = <&pcie0_default_state>;
+	pinctrl-names = "default";
+
+	status = "okay";
+};
+
+&pcie0_phy {
+	vdda-phy-supply = <&vreg_l5e_0p88>;
+	vdda-pll-supply = <&vreg_l3c_1p2>;
+
+	status = "okay";
+};
+
+/*
+ * PCIe3: Snapdragon X24 (SDX24) LTE modem (issue #7).
+ * Enumerates as an MHI endpoint; needs the SDX24 id added to
+ * drivers/bus/mhi/host/pci_generic.c (patches/04xx series).
+ * TODO(acpi): GPIOs unverified (Flex 5G values).
+ */
+&pcie3 {
+	perst-gpios = <&tlmm 178 GPIO_ACTIVE_LOW>;
+	wake-gpios = <&tlmm 180 GPIO_ACTIVE_HIGH>;
+	pinctrl-0 = <&pcie3_default_state>;
+	pinctrl-names = "default";
+
+	status = "okay";
+};
+
+&pcie3_phy {
+	vdda-phy-supply = <&vreg_l5e_0p88>;
+	vdda-pll-supply = <&vreg_l3c_1p2>;
+
+	status = "okay";
+};
+
+&pmc8180_pwrkey {
+	status = "okay";
+};
+
+&pmc8180c_lpg {
+	status = "okay";
+};
+
+&qupv3_id_0 {
+	status = "okay";
+};
+
+&qupv3_id_1 {
+	status = "okay";
+};
+
+&qupv3_id_2 {
+	status = "okay";
+};
+
+&remoteproc_adsp {
+	memory-region = <&adsp_mem>;
+	firmware-name = "qcom/sc8180xp/MICROSOFT/SPX/qcadsp8180.mbn";
+
+	status = "okay";
+};
+
+&remoteproc_cdsp {
+	memory-region = <&cdsp_mem>;
+	firmware-name = "qcom/sc8180xp/MICROSOFT/SPX/qccdsp8180.mbn";
+
+	status = "okay";
+};
+
+/*
+ * NOTE: unlike phone-style platforms, the SPX modem (X24) is a discrete PCIe
+ * device, not the integrated MPSS — remoteproc_mpss stays disabled unless the
+ * ACPI dump shows otherwise.
+ */
+
+&uart13 {
+	pinctrl-0 = <&uart13_state>;
+	pinctrl-names = "default";
+
+	status = "okay";
+
+	bluetooth {
+		compatible = "qcom,wcn3998-bt";
+
+		vddio-supply = <&vreg_s4a_1p8>;
+		vddxo-supply = <&vreg_l7a_1p8>;
+		vddrf-supply = <&vreg_l9a_1p3>;
+		vddch0-supply = <&vreg_l11c_3p3>;
+		max-speed = <3200000>;
+	};
+};
+
+/* No UFS on Surface Pro X — storage is NVMe via &pcie0. */
+
+&usb_prim_hsphy {
+	vdda-pll-supply = <&vreg_l5e_0p88>;
+	vdda18-supply = <&vreg_l12a_1p8>;
+	vdda33-supply = <&vreg_l16e_3p0>;
+
+	status = "okay";
+};
+
+&usb_prim_qmpphy {
+	vdda-phy-supply = <&vreg_l3c_1p2>;
+	vdda-pll-supply = <&vreg_l5e_0p88>;
+
+	orientation-switch;
+
+	status = "okay";
+};
+
+&usb_prim {
+	status = "okay";
+};
+
+&usb_prim_dwc3 {
+	dr_mode = "host";
+};
+
+&usb_prim_dwc3_hs {
+	remote-endpoint = <&pmic_glink_con0_hs>;
+};
+
+&usb_prim_qmpphy_dp_in {
+	remote-endpoint = <&mdss_dp0_out>;
+};
+
+&usb_prim_qmpphy_out {
+	remote-endpoint = <&pmic_glink_con0_ss>;
+};
+
+&usb_sec_dwc3_hs {
+	remote-endpoint = <&pmic_glink_con1_hs>;
+};
+
+&usb_sec_hsphy {
+	vdda-pll-supply = <&vreg_l5e_0p88>;
+	vdda18-supply = <&vreg_l12a_1p8>;
+	vdda33-supply = <&vreg_l16e_3p0>;
+
+	status = "okay";
+};
+
+&usb_sec_qmpphy {
+	vdda-phy-supply = <&vreg_l3c_1p2>;
+	vdda-pll-supply = <&vreg_l5e_0p88>;
+
+	orientation-switch;
+
+	status = "okay";
+};
+
+&usb_sec_qmpphy_dp_in {
+	remote-endpoint = <&mdss_dp1_out>;
+};
+
+&usb_sec_qmpphy_out {
+	remote-endpoint = <&pmic_glink_con1_ss>;
+};
+
+&usb_sec {
+	status = "okay";
+};
+
+&usb_sec_dwc3 {
+	dr_mode = "host";
+};
+
+&wifi {
+	/* WCN3998 — same part as Flex 5G */
+	memory-region = <&wlan_mem>;
+
+	vdd-0.8-cx-mx-supply = <&vreg_l1e_0p75>;
+	vdd-1.8-xo-supply = <&vreg_l7a_1p8>;
+	vdd-1.3-rfa-supply = <&vreg_l9a_1p3>;
+	vdd-3.3-ch0-supply = <&vreg_l11c_3p3>;
+	vdd-3.3-ch1-supply = <&vreg_l10c_3p3>;
+
+	status = "okay";
+};
+
+/* PINCTRL — all GPIO numbers below are TODO(acpi) unless noted */
+
+&pmc8180c_gpios {
+	bl_pwm_default: bl-pwm-default-state {
+		en-pins {
+			pins = "gpio8";
+			function = "normal";
+		};
+
+		pwm-pins {
+			pins = "gpio10";
+			function = "func1";
+		};
+	};
+};
+
+&tlmm {
+	gpio-reserved-ranges = <0 4>, <47 4>, <126 4>; /* TODO(acpi) */
+
+	edp_hpd_active: edp-hpd-active-state {
+		pins = "gpio10";
+		function = "edp_hot";
+	};
+
+	hall_int_active_state: hall-int-active-state {
+		pins = "gpio121";
+		function = "gpio";
+
+		bias-disable;
+	};
+
+	i2c1_active: i2c1-active-state {
+		pins = "gpio114", "gpio115";
+		function = "qup1";
+
+		bias-pull-up;
+		drive-strength = <2>;
+	};
+
+	pcie0_default_state: pcie0-default-state {
+		clkreq-pins {
+			pins = "gpio36";
+			function = "pci_e0";
+			bias-pull-up;
+		};
+
+		reset-n-pins {
+			pins = "gpio35";
+			function = "gpio";
+
+			drive-strength = <2>;
+			output-low;
+			bias-pull-down;
+		};
+
+		wake-n-pins {
+			pins = "gpio37";
+			function = "gpio";
+
+			drive-strength = <2>;
+			bias-pull-up;
+		};
+	};
+
+	pcie3_default_state: pcie3-default-state {
+		clkreq-pins {
+			pins = "gpio179";
+			function = "pci_e3";
+			bias-pull-up;
+		};
+
+		reset-n-pins {
+			pins = "gpio178";
+			function = "gpio";
+
+			drive-strength = <2>;
+			output-low;
+			bias-pull-down;
+		};
+
+		wake-n-pins {
+			pins = "gpio180";
+			function = "gpio";
+
+			drive-strength = <2>;
+			bias-pull-up;
+		};
+	};
+
+	ts_int_default: ts-int-default-state {
+		pins = "gpio122";
+		function = "gpio";
+
+		bias-pull-up;
+		drive-strength = <2>;
+	};
+
+	uart13_state: uart13-state {
+		cts-pins {
+			pins = "gpio43";
+			function = "qup13";
+			bias-pull-down;
+		};
+
+		rts-tx-pins {
+			pins = "gpio44", "gpio45";
+			function = "qup13";
+			drive-strength = <2>;
+			bias-disable;
+		};
+
+		rx-pins {
+			pins = "gpio46";
+			function = "qup13";
+			bias-pull-up;
+		};
+	};
+};
