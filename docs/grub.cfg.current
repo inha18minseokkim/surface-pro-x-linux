@@ -1,0 +1,27 @@
+set timeout=10
+set default=0
+
+# root= uses PARTUUID (kernel-native, no initramfs needed); UUID= was a bug.
+# DT entry first: ACPI mode has no USB (mainline dropped dwc3-qcom ACPI).
+
+menuentry "Ubuntu ARM64 (Device Tree + earlycon)" {
+    search --no-floppy --file --set=root /Image.gz
+    devicetree /sc8180xp-microsoft-surface-pro-x.dtb
+    linux /Image.gz root=PARTUUID=73621fa8-845a-453c-b93e-610e13c4d7a3 rw rootwait \
+        earlycon=efifb keep_bootcon console=tty0 \
+        clk_ignore_unused pd_ignore_unused arm64.nopauth efi=noruntime \
+        ignore_loglevel
+}
+
+menuentry "Ubuntu ARM64 (ACPI + earlycon; no USB until dwc3 patch)" {
+    search --no-floppy --file --set=root /Image.gz
+    linux /Image.gz root=PARTUUID=73621fa8-845a-453c-b93e-610e13c4d7a3 rw rootwait \
+        earlycon=efifb keep_bootcon console=tty0 \
+        clk_ignore_unused pd_ignore_unused arm64.nopauth efi=noruntime \
+        ignore_loglevel
+}
+
+menuentry "Windows Boot Manager" {
+    search --no-floppy --file --set=root /EFI/Microsoft/Boot/bootmgfw.efi
+    chainloader /EFI/Microsoft/Boot/bootmgfw.efi
+}
