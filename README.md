@@ -9,7 +9,7 @@ Microsoft Surface Pro X (SQ2)에서 Ubuntu ARM64를 구동하기 위한 커널 �
 |------|------|---------------|
 | SoC | Qualcomm SQ2 (sc8180xp, Snapdragon 8cx Gen 2) | `arch/arm64`, `drivers/soc/qcom` |
 | GPU | Adreno 680 계열 (MS 브랜딩: Adreno 690) | `drivers/gpu/drm/msm` (freedreno) |
-| Wi-Fi/BT | Qualcomm WCN3998 | `drivers/net/wireless/ath/ath11k` |
+| Wi-Fi/BT | Qualcomm WCN3998 | `drivers/net/wireless/ath/ath10k` (SNOC) |
 | 셀룰러 | Snapdragon X24 LTE (SDX24, PCIe) | `drivers/bus/mhi`, `drivers/net/wwan` |
 | 스토리지 | NVMe (PCIe) | `drivers/nvme` + qcom PCIe quirk |
 | 키보드 | Surface Type Cover | `drivers/hid`, Surface Aggregator |
@@ -39,16 +39,16 @@ docs/       전략 및 컴포넌트별 상세 문서
 
 | 이슈 | 컴포넌트 | 상태 |
 |------|----------|------|
-| #1 | 전체 개요 / 프로젝트 기반 | 진행 중 (이 레포) |
-| #2 | 부팅 환경 (UEFI/GRUB/Secure Boot) | 문서·스크립트 작성 |
-| #3 | sc8180xp Device Tree | 미착수 — 최우선 블로커 |
-| #4 | NVMe PCIe quirk | 미착수 |
-| #5 | GPU (Adreno 680, freedreno) | 미착수 |
-| #6 | Wi-Fi/BT (ath11k) | 미착수 |
-| #7 | 셀룰러 모뎀 (X24, MHI/WWAN) | 미착수 |
-| #8 | Type Cover 키보드/터치패드 | 미착수 |
+| #1 | 전체 개요 / 프로젝트 기반 | ✅ 완료 (이 레포) |
+| #2 | 부팅 환경 (UEFI/GRUB/Secure Boot) | 🔧 문서·스크립트 완료, 실기기 검증 대기 |
+| #3 | sc8180xp Device Tree | 🔧 초안 완료, ACPI 덤프 대기 (TODO(acpi)) |
+| #4 | NVMe PCIe quirk | 🔧 패치 작성 완료 (`patches/0100`), 실기기 검증 대기 |
+| #5 | GPU (Adreno 680, freedreno) | DT 노드·config 준비됨, zap firmware 필요 |
+| #6 | Wi-Fi/BT (ath10k SNOC — 이슈의 ath11k는 오기) | DT 노드·config 준비됨, firmware 필요 |
+| #7 | 셀룰러 모뎀 (X24, MHI/WWAN) | 🔧 메인라인 지원 확인 (17cb:0304), 실기기 검증 대기 |
+| #8 | Type Cover 키보드/터치패드 | USB HID 경로 — 부팅 후 확인 |
 | #9 | 카메라/터치스크린/센서 | blocked (펌웨어 부재) |
-| #10 | 빌드 환경 가이드 | scripts/ 로 구현 |
+| #10 | 빌드 환경 가이드 | ✅ scripts/ + configs/ 로 구현 |
 
 ## 빠른 시작 (x86_64 호스트에서 크로스 빌드)
 
