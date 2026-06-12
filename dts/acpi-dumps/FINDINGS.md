@@ -75,8 +75,26 @@ ACPI PCI 호스트 브리지 ↔ 메인라인 DT 매핑 (32-bit Memory32Fixed �
 Spectra 390 ISP: QCOM0428(ISP), QCOM0435(platform), QCOM0436(JPEG),
 QCOM04A4(MIPI CSI). 전면(CAMF)/후면(CAMS)/IR(CAMI) — 메인라인 CAMSS 지원 없음, blocked 유지.
 
-## 미해결 (TODO(acpi-pep))
+## PEP 테이블 분석 (1차)
 
-PCIe perst/clkreq/wake GPIO, 백라이트 PWM, lid GPIO, 전원 레일 시퀀스는
-PEP 장치(QCOM0419, `surfaceprox_pep`)의 바이너리 테이블 안에 있어 추가 분석 필요.
-DSL 파일에서 `\_SB.PEP0` 분석이 다음 단계.
+PEP 블록은 DSL에서 사람이 읽을 수 있는 Package 구조다
+(`"TLMMGPIO"/"PMICGPIO"/"PMICVREGVOTE"/"CLOCK"` 엔트리).
+
+### PCIe 전원/GPIO (라인 51194~54440 부근, 디바이스별 블록)
+
+| 블록 | 발견 항목 | 해석 |
+|------|-----------|------|
+| \_SB.PCI1 | TLMMGPIO 0xB0(176) | pcie1 핀 (미사용 포트) |
+| \_SB.PCI2 (**NVMe**) | **PMICGPIO: PMIC#2, GPIO 10**, digital output (ON=1/OFF=0) | SSD 전원 스위치 또는 PERST — TLMM 핀 없음 |
+| \_SB.PCI2 | **PMICVREGVOTE: LDO3_C @0x124F80(≈1.2V), LDO5_E @0xD6D80(≈0.88V)** | pcie2_phy 레일 = `vreg_l3c_1p2` + `vreg_l5e_0p88` **확정** ✅ |
+| \_SB.PCI3 | TLMMGPIO 0xB3(179) | pcie3 핀 (Flex 5G의 clkreq 179와 일치) |
+
+### 디스플레이 블록
+
+TLMMGPIO 0x0A(10) = eDP HPD (DTS의 `edp_hot` gpio10과 일치 ✅), 0x82(130),
+PMICGPIO(PMIC#2, GPIO 9, digital input).
+
+## 미해결
+
+백라이트 PWM 채널, lid GPIO, PMIC 인덱스↔라벨 매핑(#2 = pmc8180c 추정),
+reserved-memory 실주소(리눅스 부팅 후 efi memmap으로 확정).

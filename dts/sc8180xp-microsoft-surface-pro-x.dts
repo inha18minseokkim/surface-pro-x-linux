@@ -424,8 +424,11 @@
  * _UID 2, window 0x70200000 (= mainline pcie2 at 0x1c18000), child device
  * SK hynix NVMe 1c5c:1327. PCIe0/PCIe3 ports are empty, PCIe1 disabled —
  * all left off.
- * TODO(acpi-pep): perst/wake/clkreq GPIOs are managed by the PEP on Windows;
- * pins below are unverified sc8180x reference values.
+ * PEP analysis (FINDINGS.md): the PCI2 power sequence toggles PMIC#2 GPIO 10
+ * (digital output) — likely the SSD power switch, possibly PERST. No TLMM
+ * pins appear in the PCI2 PEP block.
+ * TODO(acpi-pep): perst/wake/clkreq TLMM pins below are unverified reference
+ * values; if probing fails, try perst on &pmc8180c_gpios 10.
  */
 &pcie2 {
 	perst-gpios = <&tlmm 102 GPIO_ACTIVE_LOW>;
@@ -437,6 +440,10 @@
 };
 
 &pcie2_phy {
+	/*
+	 * Rails confirmed from the PCI2 PEP block: LDO5_E @ 0.88 V and
+	 * LDO3_C @ 1.2 V — matches the Flex 5G PHY supply assignment.
+	 */
 	vdda-phy-supply = <&vreg_l5e_0p88>;
 	vdda-pll-supply = <&vreg_l3c_1p2>;
 
