@@ -50,7 +50,27 @@ docs/       전략 및 컴포넌트별 상세 문서
 | #9 | 카메라/터치스크린/센서 | 터치=HID over SPI(spi1, IRQ 122) 확정. 카메라 Spectra 390 blocked |
 | #10 | 빌드 환경 가이드 | ✅ scripts/ + configs/ 로 구현 |
 
-## 빠른 시작 (x86_64 호스트에서 크로스 빌드)
+## 빠른 시작
+
+### A. SPX 자체에서 WSL2 native 빌드 (기본 — 검증됨 ✅)
+
+```powershell
+wsl --install -d Ubuntu --no-launch
+```
+```bash
+# WSL Ubuntu(arm64) 안에서:
+apt install build-essential flex bison libssl-dev libelf-dev bc kmod cpio dwarves zstd device-tree-compiler
+git clone --depth 1 https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git ~/kernel
+bash scripts/wsl-prepare-tree.sh   # 패치 + DTS 주입 + config 머지
+bash scripts/wsl-build-kernel.sh   # Image.gz + dtbs + modules
+bash scripts/wsl-collect-artifacts.sh  # → build-output/ 로 수집
+```
+
+**빌드 검증 완료 (2026-06-12, 커널 7.1.0-rc7)**: Image.gz 15.8MB, SPX DTB
+무경고 컴파일, 모듈 1578개 (ath10k_snoc/qcom_q6v5_pas/ipa/msm/qrtr 포함),
+0100 quirk 패치 적용·컴파일 확인.
+
+### B. x86_64 호스트에서 크로스 빌드 (대안)
 
 ```bash
 ./scripts/setup-build-env.sh   # 툴체인·의존성 설치
