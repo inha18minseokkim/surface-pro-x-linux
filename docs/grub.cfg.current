@@ -1,13 +1,13 @@
 set timeout=30
 set default=0
 
-menuentry "CONTROL: base DT only, no USB (bisect test)" {
+menuentry "CONTROL + pstore: capture panic to EFI vars" {
     search --no-floppy --file --set=root /Image.gz
     devicetree /sc8180xp-spx-control.dtb
     linux /Image.gz root=PARTUUID=73621fa8-845a-453c-b93e-610e13c4d7a3 rw rootwait \
         earlycon=efifb keep_bootcon console=tty0 \
-        module_blacklist=msm fw_devlink=off panic=10 \
-        clk_ignore_unused pd_ignore_unused arm64.nopauth efi=noruntime \
+        module_blacklist=msm fw_devlink=off panic=10 initcall_debug \
+        clk_ignore_unused pd_ignore_unused arm64.nopauth \
         ignore_loglevel
 }
 
