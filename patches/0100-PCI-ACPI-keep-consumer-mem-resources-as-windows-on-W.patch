@@ -1,0 +1,83 @@
+From: Surface Pro X Linux Project <minseokkim1020@gmail.com>
+Subject: [PATCH] PCI/ACPI: Keep consumer memory resources as host bridge
+ windows on WoA devices
+
+Qualcomm Windows-on-ARM machines (Microsoft Surface Pro X among others)
+describe PCIe host bridge windows as Memory32Fixed "consumer"
+descriptors in the PNP0A03 _CRS instead of producer descriptors.
+
+Commit 8fd4391ee717 ("arm64: PCI: Exclude ACPI "consumer" resources
+from host bridge windows") makes the kernel drop every non-window
+resource entry while preparing host bridge resources. On these
+machines that removes the only memory window the firmware provides, so
+BAR assignment fails ("BAR 0: failed to assign [mem ...]") and PCIe
+devices — most visibly the NVMe SSD — show up in lspci but never bind
+a driver.
+
+Add a DMI-matched quirk that converts consumer memory descriptors into
+host bridge windows instead of destroying them on affected machines.
+
+This only matters for the ACPI boot path; Device Tree boot is
+unaffected. Approach follows Shawn Guo's proposal ("arm64: PCI: Add
+quirk for Qualcomm WoA devices", 2023-04), which as of mainline 2026
+has not landed: drivers/pci/pci-acpi.c still destroys all non-window
+entries unconditionally.
+
+Link: https://lore.kernel.org/lkml/20230423030520.9570-1-shawn.guo@linaro.org/
+---
+ drivers/pci/pci-acpi.c | 33 ++++++++++++++++++++++++++++++++-
+ 1 file changed, 32 insertions(+), 1 deletion(-)
+
+--- a/drivers/pci/pci-acpi.c
++++ b/drivers/pci/pci-acpi.c
+@@ -8,6 +8,7 @@
+  */
+
+ #include <linux/delay.h>
++#include <linux/dmi.h>
+ #include <linux/init.h>
+ #include <linux/iommu.h>
+ #include <linux/irqdomain.h>
+@@ -1591,14 +1592,44 @@ int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+ 	return 0;
+ }
+
++/*
++ * Qualcomm Windows-on-ARM firmware describes host bridge windows as
++ * Memory32Fixed "consumer" descriptors in the PNP0A03 _CRS. Dropping
++ * them leaves the bridge without memory windows and BAR assignment
++ * fails for every device behind it (NVMe, Wi-Fi, WWAN).
++ */
++static const struct dmi_system_id woa_consumer_window_quirk_table[] = {
++	{
++		/* Microsoft Surface Pro X (SQ1 and SQ2) */
++		.matches = {
++			DMI_MATCH(DMI_SYS_VENDOR, "Microsoft Corporation"),
++			DMI_MATCH(DMI_PRODUCT_NAME, "Surface Pro X"),
++		},
++	},
++	{ }
++};
++
+ static int pci_acpi_root_prepare_resources(struct acpi_pci_root_info *ci)
+ {
+ 	struct resource_entry *entry, *tmp;
++	bool keep_consumer_mem;
+ 	int status;
+
++	keep_consumer_mem = dmi_check_system(woa_consumer_window_quirk_table);
++
+ 	status = acpi_pci_probe_root_resources(ci);
+ 	resource_list_for_each_entry_safe(entry, tmp, &ci->resources) {
+-		if (!(entry->res->flags & IORESOURCE_WINDOW))
++		if (entry->res->flags & IORESOURCE_WINDOW)
++			continue;
++
++		if (keep_consumer_mem &&
++		    resource_type(entry->res) == IORESOURCE_MEM)
++			entry->res->flags |= IORESOURCE_WINDOW;
++		else
+ 			resource_list_destroy_entry(entry);
+ 	}
+ 	return status;
+ }
